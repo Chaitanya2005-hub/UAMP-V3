@@ -178,8 +178,7 @@ import { ThemeToggleComponent } from '../../../shared/components/theme-toggle/th
                   <select [(ngModel)]="regRole" name="regRole" 
                           class="w-full px-3 py-2 bg-slate-900/90 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-indigo-500">
                     <option value="STUDENT">Student</option>
-                    <option value="TEACHER">Faculty/Teacher</option>
-                    <option value="ADMIN">Administrator</option>
+                    <option value="TEACHER">Faculty / Teacher</option>
                   </select>
                 </div>
               </div>
@@ -364,8 +363,14 @@ export class LoginComponent {
     };
 
     this.authService.registerWithOtp(payload).subscribe({
-      next: () => {
+      next: (res) => {
         this.isLoading = false;
+        if (res.pendingApproval) {
+          this.otpSent = false;
+          this.otpSuccessMessage = res.message || 'Account registered & verified via OTP! Pending Admin approval before login.';
+          this.mode = 'login';
+          this.username = this.regUsername;
+        }
       },
       error: (err) => {
         this.isLoading = false;

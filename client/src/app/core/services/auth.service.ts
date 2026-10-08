@@ -43,14 +43,16 @@ export class AuthService {
   }
 
   registerWithOtp(payload: any): Observable<any> {
-    return this.http.post<{ token: string; user: User; message: string }>(`${this.apiUrl}/verify-otp-register`, payload).pipe(
+    return this.http.post<{ token?: string; user: User; message: string; pendingApproval?: boolean }>(`${this.apiUrl}/verify-otp-register`, payload).pipe(
       tap(res => {
-        this.token.set(res.token);
-        localStorage.setItem('uamp_token', res.token);
-        this.currentUser.set(res.user);
-        this.inactivityNotice.set(null);
-        this.startInactivityTimer();
-        this.redirectBasedOnRole(res.user.role);
+        if (res.token && res.user) {
+          this.token.set(res.token);
+          localStorage.setItem('uamp_token', res.token);
+          this.currentUser.set(res.user);
+          this.inactivityNotice.set(null);
+          this.startInactivityTimer();
+          this.redirectBasedOnRole(res.user.role);
+        }
       })
     );
   }

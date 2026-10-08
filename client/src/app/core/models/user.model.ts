@@ -10,4 +10,5 @@ export interface User {
   department: string;
   section?: string;
   photoPath?: string;
+  approvalStatus?: 'APPROVED' | 'PENDING';
 }

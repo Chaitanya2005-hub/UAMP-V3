@@ -25,7 +25,8 @@ const users = [
     year: '3rd Year',
     department: 'Computer Science & Engineering',
     section: 'CS-A',
-    photoPath: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256'
+    photoPath: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
+    approvalStatus: 'APPROVED'
   },
   {
     id: 'u-std-102',
@@ -37,7 +38,8 @@ const users = [
     year: '3rd Year',
     department: 'Computer Science & Engineering',
     section: 'CS-B',
-    photoPath: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=256'
+    photoPath: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=256',
+    approvalStatus: 'APPROVED'
   },
   {
     id: 'u-std-103',
@@ -49,7 +51,8 @@ const users = [
     year: '2nd Year',
     department: 'Electrical Engineering',
     section: 'EE-A',
-    photoPath: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=256'
+    photoPath: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=256',
+    approvalStatus: 'APPROVED'
   },
   {
     id: 'u-tch-201',
@@ -61,7 +64,8 @@ const users = [
     year: 'N/A',
     department: 'Computer Science & Engineering',
     section: 'All',
-    photoPath: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=256'
+    photoPath: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=256',
+    approvalStatus: 'APPROVED'
   },
   {
     id: 'u-adm-301',
@@ -73,7 +77,8 @@ const users = [
     year: 'N/A',
     department: 'University Administration',
     section: 'HQ',
-    photoPath: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=256'
+    photoPath: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=256',
+    approvalStatus: 'APPROVED'
   }
 ];
 
@@ -413,6 +418,10 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(400).json({ message: 'Invalid username or password.' });
   }
 
+  if (user.approvalStatus === 'PENDING') {
+    return res.status(403).json({ message: 'Your account registration is pending Admin approval. Please contact University Administration to activate your account.' });
+  }
+
   const token = jwt.sign(
     { id: user.id, username: user.username, role: user.role, fullName: user.fullName },
     JWT_SECRET,
@@ -449,6 +458,10 @@ app.post('/api/auth/verify-otp-register', (req, res) => {
     return res.status(400).json({ message: 'All registration fields and OTP are required.' });
   }
 
+  if (role === 'ADMIN') {
+    return res.status(400).json({ message: 'Admin account creation is restricted. Only Student and Faculty/Teacher self-registrations are permitted.' });
+  }
+
   const normalizedEmail = email.toLowerCase();
   const storedRecord = activeOtpStore.get(normalizedEmail);
 
@@ -473,20 +486,20 @@ app.post('/api/auth/verify-otp-register', (req, res) => {
     year: year || '1st Year',
     department: department || 'Computer Science & Engineering',
     section: section || 'Sec-A',
-    photoPath: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=256'
+    photoPath: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=256',
+    approvalStatus: 'PENDING'
   };
 
   users.push(newUser);
   activeOtpStore.delete(normalizedEmail);
 
-  const token = jwt.sign(
-    { id: newUser.id, username: newUser.username, role: newUser.role, fullName: newUser.fullName },
-    JWT_SECRET,
-    { expiresIn: '12h' }
-  );
-
   const { password: _, ...userWithoutPass } = newUser;
-  res.status(201).json({ token, user: userWithoutPass, message: 'Account created & verified successfully!' });
+  res.status(201).json({
+    success: true,
+    pendingApproval: true,
+    user: userWithoutPass,
+    message: 'Account registered & verified via OTP! Your account is pending Admin approval before you can sign in.'
+  });
 });
 
 app.get('/api/auth/me', authenticateToken, (req, res) => {
@@ -965,11 +978,20 @@ app.post('/api/users', authenticateToken, (req, res) => {
     year: year || '1st Year',
     department: department || 'Engineering',
     section: section || 'Sec-A',
-    photoPath: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=256'
+    photoPath: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=256',
+    approvalStatus: 'APPROVED'
   };
   users.push(newUser);
   const { password: _, ...userWithoutPass } = newUser;
   res.status(201).json(userWithoutPass);
+});
+
+app.post('/api/users/:id/approve', authenticateToken, (req, res) => {
+  const user = users.find(u => u.id === req.params.id);
+  if (user) {
+    user.approvalStatus = 'APPROVED';
+  }
+  res.json({ message: 'User account approved successfully', user });
 });
 
 app.delete('/api/users/:id', authenticateToken, (req, res) => {

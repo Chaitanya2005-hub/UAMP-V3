@@ -34,6 +34,7 @@ import { User, UserRole } from '../../../core/models/user.model';
                 <th class="p-3">ERP Roll ID</th>
                 <th class="p-3">Role</th>
                 <th class="p-3">Department</th>
+                <th class="p-3">Approval Status</th>
                 <th class="p-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -55,7 +56,16 @@ import { User, UserRole } from '../../../core/models/user.model';
                   </span>
                 </td>
                 <td class="p-3 font-medium">{{ u.department }}</td>
-                <td class="p-3 text-right">
+                <td class="p-3">
+                  <span [class]="u.approvalStatus === 'PENDING' ? 'badge badge-warning flex items-center gap-1 w-fit' : 'badge badge-success flex items-center gap-1 w-fit'">
+                    <i [class]="u.approvalStatus === 'PENDING' ? 'fa-solid fa-clock-rotate-left' : 'fa-solid fa-circle-check'"></i>
+                    {{ u.approvalStatus === 'PENDING' ? 'PENDING APPROVAL' : 'ACTIVE / APPROVED' }}
+                  </span>
+                </td>
+                <td class="p-3 text-right space-x-2">
+                  <button *ngIf="u.approvalStatus === 'PENDING'" (click)="approveUser(u.id)" class="btn btn-sm bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2 py-1 text-[11px] rounded-lg">
+                    <i class="fa-solid fa-user-check mr-1"></i> Approve
+                  </button>
                   <button (click)="deleteUser(u.id)" class="btn btn-outline btn-sm text-rose-500 border-rose-200 dark:border-rose-900">
                     <i class="fa-solid fa-trash"></i>
                   </button>
@@ -138,6 +148,12 @@ export class ManageUsersComponent implements OnInit {
       this.showCreateModal = false;
       this.newFullName = '';
       this.newUsername = '';
+      this.loadUsers();
+    });
+  }
+
+  approveUser(id: string): void {
+    this.http.post(`http://localhost:3000/api/users/${id}/approve`, {}).subscribe(() => {
       this.loadUsers();
     });
   }
