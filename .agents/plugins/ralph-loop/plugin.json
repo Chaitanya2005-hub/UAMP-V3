@@ -1,0 +1,6 @@
+{
+  "name": "ralph-loop",
+  "version": "1.0.0",
+  "description": "Autonomous self-healing iterative execution loop inspired by Ralph. Executes continuously until 100% test & build pass.",
+  "keywords": ["ralph", "ralph-loop", "self-healing", "iterative"]
+}

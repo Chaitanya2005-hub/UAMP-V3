@@ -1,0 +1,6 @@
+{
+  "name": "get-shit-done",
+  "version": "1.0.0",
+  "description": "Autonomous goal execution engine for driving complex objectives to 100% completion.",
+  "keywords": ["gsd", "get-shit-done", "autonomous"]
+}

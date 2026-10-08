@@ -1,0 +1,6 @@
+{
+  "name": "coderabbit",
+  "version": "1.0.0",
+  "description": "AI Code Reviewer & Security Auditor inspired by CodeRabbit. Performs multi-dimensional code reviews, security scans, and PR summaries.",
+  "keywords": ["coderabbit", "code-review", "security-audit", "pr-review"]
+}
