@@ -38,16 +38,16 @@ import { ProctoringService } from '../../../core/services/proctoring.service';
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <app-stat-card 
           title="Active Students Enrolled" 
-          value="142" 
-          subtitle="Across CS-A and CS-B"
+          [value]="activeStudentsCount" 
+          subtitle="Enrolled in Department"
           iconClass="fa-solid fa-users"
           iconBgClass="bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
         </app-stat-card>
 
         <app-stat-card 
-          title="Ongoing Proctored Exam" 
-          value="DBMS Mid-Sem" 
-          subtitle="3 Active Live Feeds"
+          title="Live Proctored Streams" 
+          [value]="activeProctorCount" 
+          [subtitle]="activeProctorCount > 0 ? activeProctorCount + ' Active Student WebCam Feeds' : 'No Active Exams Currently'"
           iconClass="fa-solid fa-video"
           iconBgClass="bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
         </app-stat-card>
@@ -105,5 +105,24 @@ export class TeacherDashboardComponent implements OnInit {
   authService = inject(AuthService);
   proctoringService = inject(ProctoringService);
 
-  ngOnInit(): void {}
+  activeStudentsCount: number = 0;
+  activeProctorCount: number = 0;
+  pollInterval: any;
+
+  ngOnInit(): void {
+    this.loadLiveData();
+    this.pollInterval = setInterval(() => {
+      this.loadLiveData();
+    }, 3000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.pollInterval) clearInterval(this.pollInterval);
+  }
+
+  loadLiveData(): void {
+    this.proctoringService.getActiveSessions().subscribe(sessions => {
+      this.activeProctorCount = sessions.length;
+    });
+  }
 }

@@ -1,6 +1,7 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../../core/services/auth.service';
 import { StatCardComponent } from '../../../shared/components/stat-card/stat-card.component';
 import { InrCurrencyPipe } from '../../../shared/pipes/inr-currency.pipe';
@@ -38,15 +39,23 @@ import { InrCurrencyPipe } from '../../../shared/pipes/inr-currency.pipe';
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <app-stat-card 
           title="Total Registered Users" 
-          value="1,240" 
-          subtitle="3 Roles (Student, Faculty, Admin)"
+          [value]="totalUsersCount" 
+          [subtitle]="pendingUsersCount > 0 ? pendingUsersCount + ' Pending Admin Approvals' : 'All Accounts Active'"
           iconClass="fa-solid fa-users-gear"
           iconBgClass="bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
         </app-stat-card>
 
         <app-stat-card 
+          title="Live Proctored Feeds" 
+          [value]="activeProctorCount" 
+          subtitle="Real-time WebCam Monitoring"
+          iconClass="fa-solid fa-video"
+          iconBgClass="bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
+        </app-stat-card>
+
+        <app-stat-card 
           title="Scheduled Exams" 
-          value="12" 
+          [value]="examsCount" 
           subtitle="Proctored Anti-Cheat Active"
           iconClass="fa-solid fa-laptop-code"
           iconBgClass="bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400">
@@ -55,38 +64,32 @@ import { InrCurrencyPipe } from '../../../shared/pipes/inr-currency.pipe';
         <app-stat-card 
           title="Fee Revenue Cleared" 
           value="₹1,70,000" 
-          subtitle="85% Approval Rate"
+          subtitle="85% Clearance Approval"
           iconClass="fa-solid fa-receipt"
           iconBgClass="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400"
           trend="up">
-        </app-stat-card>
-
-        <app-stat-card 
-          title="Hall Tickets Released" 
-          value="89%" 
-          subtitle="11% Blocked Dues"
-          iconClass="fa-solid fa-id-card"
-          iconBgClass="bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
         </app-stat-card>
       </div>
 
       <!-- Admin Actions Grid -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         
+        <a routerLink="/admin/manage-users" class="uamp-card hover:border-purple-500/50 transition-all p-6 group space-y-3">
+          <div class="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+            <i class="fa-solid fa-user-check"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-900 dark:text-white">User Directory & Approvals</h3>
+          <p class="text-xs text-slate-500">
+            Manage user accounts. <strong class="text-amber-500 font-bold" *ngIf="pendingUsersCount > 0">{{ pendingUsersCount }} pending approval request(s)</strong>
+          </p>
+        </a>
+
         <a routerLink="/admin/manage-admit-cards" class="uamp-card hover:border-emerald-500/50 transition-all p-6 group space-y-3">
           <div class="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
             <i class="fa-solid fa-id-card"></i>
           </div>
           <h3 class="text-base font-bold text-slate-900 dark:text-white">Block / Release Admit Cards</h3>
           <p class="text-xs text-slate-500">Instant toggle controls to hold or release hall tickets for students based on fee clearance.</p>
-        </a>
-
-        <a routerLink="/admin/fees" class="uamp-card hover:border-amber-500/50 transition-all p-6 group space-y-3">
-          <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
-            <i class="fa-solid fa-calculator"></i>
-          </div>
-          <h3 class="text-base font-bold text-slate-900 dark:text-white">Fee Amount Edits & Approvals</h3>
-          <p class="text-xs text-slate-500">Edit student total/paid amounts and approve/disapprove tuition fee payments.</p>
         </a>
 
         <a routerLink="/admin/live-monitoring" class="uamp-card hover:border-rose-500/50 transition-all p-6 group space-y-3">
@@ -104,6 +107,37 @@ import { InrCurrencyPipe } from '../../../shared/pipes/inr-currency.pipe';
 })
 export class AdminDashboardComponent implements OnInit {
   authService = inject(AuthService);
+  http = inject(HttpClient);
 
-  ngOnInit(): void {}
+  totalUsersCount: number = 0;
+  pendingUsersCount: number = 0;
+  activeProctorCount: number = 0;
+  examsCount: number = 0;
+  pollInterval: any;
+
+  ngOnInit(): void {
+    this.loadLiveData();
+    this.pollInterval = setInterval(() => {
+      this.loadLiveData();
+    }, 3000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.pollInterval) clearInterval(this.pollInterval);
+  }
+
+  loadLiveData(): void {
+    this.http.get<any[]>('http://localhost:3000/api/users').subscribe(users => {
+      this.totalUsersCount = users.length;
+      this.pendingUsersCount = users.filter(u => u.approvalStatus === 'PENDING').length;
+    });
+
+    this.http.get<any[]>('http://localhost:3000/api/proctor/active-sessions').subscribe(sessions => {
+      this.activeProctorCount = sessions.length;
+    });
+
+    this.http.get<any[]>('http://localhost:3000/api/exams').subscribe(exams => {
+      this.examsCount = exams.length;
+    });
+  }
 }
