@@ -4,12 +4,13 @@ import { Observable, tap } from 'rxjs';
 import { Exam } from '../models/exam.model';
 import { Question } from '../models/question.model';
 import { Result } from '../models/result.model';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ExamService {
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
 
   exams = signal<Exam[]>([]);
   activeExam = signal<Exam | null>(null);
@@ -30,6 +31,14 @@ export class ExamService {
 
   getQuestions(examId: string): Observable<Question[]> {
     return this.http.get<Question[]>(`${this.apiUrl}/exams/${examId}/questions`);
+  }
+
+  addManualQuestion(payload: Omit<Question, 'id'>): Observable<Question> {
+    return this.http.post<Question>(`${this.apiUrl}/teacher/questions`, payload);
+  }
+
+  getQuestionsCount(): Observable<{ count: number }> {
+    return this.http.get<{ count: number }>(`${this.apiUrl}/teacher/questions-count`);
   }
 
   submitExam(examId: string, answers: Record<string, string>, warningCount: number, securityLogs: string[]): Observable<Result> {

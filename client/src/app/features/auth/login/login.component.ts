@@ -95,9 +95,16 @@ import { ThemeToggleComponent } from '../../../shared/components/theme-toggle/th
                   <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
                     <i class="fa-solid fa-lock text-sm"></i>
                   </span>
-                  <input type="password" [(ngModel)]="password" name="password" required
-                         class="w-full pl-10 pr-4 py-2.5 bg-slate-900/90 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  <input [type]="showLoginPassword ? 'text' : 'password'" [(ngModel)]="password" name="password" required
+                         class="w-full pl-10 pr-10 py-2.5 bg-slate-900/90 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                          placeholder="••••••••">
+                  <button type="button"
+                          (click)="showLoginPassword = !showLoginPassword"
+                          [attr.aria-label]="showLoginPassword ? 'Hide password' : 'Show password'"
+                          [title]="showLoginPassword ? 'Hide password' : 'Show password'"
+                          class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200 transition-colors">
+                    <i [class]="showLoginPassword ? 'fa-solid fa-eye-slash text-sm' : 'fa-solid fa-eye text-sm'"></i>
+                  </button>
                 </div>
               </div>
 
@@ -192,9 +199,18 @@ import { ThemeToggleComponent } from '../../../shared/components/theme-toggle/th
 
               <div>
                 <label class="block text-xs font-bold text-slate-300 mb-1">Password</label>
-                <input type="password" [(ngModel)]="regPassword" name="regPassword" required
-                       class="w-full px-3 py-2 bg-slate-900/90 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                       placeholder="Create secure password">
+                <div class="relative">
+                  <input [type]="showRegPassword ? 'text' : 'password'" [(ngModel)]="regPassword" name="regPassword" required
+                         class="w-full pl-3 pr-10 py-2 bg-slate-900/90 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                         placeholder="Create secure password">
+                  <button type="button"
+                          (click)="showRegPassword = !showRegPassword"
+                          [attr.aria-label]="showRegPassword ? 'Hide password' : 'Show password'"
+                          [title]="showRegPassword ? 'Hide password' : 'Show password'"
+                          class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200 transition-colors">
+                    <i [class]="showRegPassword ? 'fa-solid fa-eye-slash text-sm' : 'fa-solid fa-eye text-sm'"></i>
+                  </button>
+                </div>
               </div>
 
               <button type="submit" [disabled]="isLoading"
@@ -260,12 +276,14 @@ export class LoginComponent {
   // Login fields
   username = '';
   password = '';
+  showLoginPassword = false;
   
   // Register fields
   regFullName = '';
   regEmail = '';
   regUsername = '';
   regPassword = '';
+  showRegPassword = false;
   regRole: 'STUDENT' | 'TEACHER' | 'ADMIN' = 'STUDENT';
   regDepartment = 'Computer Science & Engineering';
   regOtp = '';
@@ -280,6 +298,8 @@ export class LoginComponent {
     this.mode = targetMode;
     this.errorMessage = '';
     this.otpSuccessMessage = '';
+    this.showLoginPassword = false;
+    this.showRegPassword = false;
   }
 
   fillDemo(role: string): void {

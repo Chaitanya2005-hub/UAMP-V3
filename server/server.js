@@ -1,7 +1,10 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const QRCode = require('qrcode');
+const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -628,7 +631,7 @@ app.post('/api/exams/:id/submit', authenticateToken, (req, res) => {
 
 // Live WebCam Proctoring & Monitoring
 app.post('/api/proctor/stream', authenticateToken, (req, res) => {
-  const { examId, frame, warningCount, status, currentQuestion } = req.body;
+  const { examId, frame, warningCount, noiseWarningCount, status, currentQuestion } = req.body;
   const student = users.find(u => u.id === req.user.id);
   
   if (student) {
@@ -642,6 +645,7 @@ app.post('/api/proctor/stream', authenticateToken, (req, res) => {
       department: student.department,
       examId: examId || 'ex-101',
       warningCount: warningCount || 0,
+      noiseWarningCount: noiseWarningCount || 0,
       frame: frame || null,
       currentQuestion: currentQuestion || 1,
       lastUpdated: new Date().toLocaleTimeString(),
@@ -650,10 +654,11 @@ app.post('/api/proctor/stream', authenticateToken, (req, res) => {
     });
   }
 
-  // Return unread proctor messages if any
+  // Return unread proctor messages and termination state if any
   const session = activeProctoringSessions.get(req.user.id);
   const unreadMessages = session ? session.proctorMessages || [] : [];
-  res.json({ success: true, timestamp: Date.now(), messages: unreadMessages });
+  const forceTerminated = !!(session && session.forceTerminated);
+  res.json({ success: true, timestamp: Date.now(), messages: unreadMessages, forceTerminated });
 });
 
 app.get('/api/proctor/active-sessions', authenticateToken, (req, res) => {
@@ -677,12 +682,73 @@ app.post('/api/proctor/send-warning', authenticateToken, (req, res) => {
   res.status(404).json({ message: 'Active student proctor session not found.' });
 });
 
+app.post('/api/proctor/flag', authenticateToken, (req, res) => {
+  const { studentId, reason } = req.body;
+  const session = activeProctoringSessions.get(studentId);
+  if (!session) {
+    return res.status(404).json({ message: 'Active student proctor session not found.' });
+  }
+  session.flagged = true;
+  session.warningCount = (session.warningCount || 0) + 1;
+  session.status = session.warningCount >= 3 ? 'TERMINATED_VIOLATION' : 'FLAGGED';
+  if (!session.proctorMessages) session.proctorMessages = [];
+  session.proctorMessages.push({
+    id: `msg-${Date.now()}`,
+    sender: req.user.fullName || 'Faculty Proctor',
+    text: reason || 'Suspicious activity flagged by proctor.',
+    timestamp: new Date().toLocaleTimeString()
+  });
+  res.json({ success: true, session });
+});
+
+app.post('/api/proctor/terminate', authenticateToken, (req, res) => {
+  const { studentId, reason } = req.body;
+  const session = activeProctoringSessions.get(studentId);
+  if (!session) {
+    return res.status(404).json({ message: 'Active student proctor session not found.' });
+  }
+  session.status = 'TERMINATED_BY_ADMIN';
+  session.forceTerminated = true;
+  if (!session.proctorMessages) session.proctorMessages = [];
+  session.proctorMessages.push({
+    id: `msg-${Date.now()}`,
+    sender: req.user.fullName || 'Exam Administrator',
+    text: reason || 'Your examination session was terminated by the administrator.',
+    timestamp: new Date().toLocaleTimeString()
+  });
+  res.json({ success: true, message: 'Proctored session terminated.' });
+});
+
 app.post('/api/proctor/clear-messages', authenticateToken, (req, res) => {
   const session = activeProctoringSessions.get(req.user.id);
   if (session) {
     session.proctorMessages = [];
   }
   res.json({ success: true });
+});
+
+// Manual Question Creation & Stats
+app.post('/api/teacher/questions', authenticateToken, (req, res) => {
+  const { examId, questionText, optionA, optionB, optionC, optionD, correctAnswer } = req.body;
+  if (!questionText || !optionA || !optionB || !optionC || !optionD) {
+    return res.status(400).json({ message: 'Question text and all four options (A-D) are required.' });
+  }
+  const newQuestion = {
+    id: `q-man-${Date.now()}`,
+    examId: examId || 'ex-101',
+    questionText,
+    optionA,
+    optionB,
+    optionC,
+    optionD,
+    correctAnswer: correctAnswer || 'A'
+  };
+  questions.push(newQuestion);
+  res.status(201).json(newQuestion);
+});
+
+app.get('/api/teacher/questions-count', authenticateToken, (req, res) => {
+  res.json({ count: questions.length });
 });
 
 // Gemini AI Question Generator
@@ -968,6 +1034,13 @@ app.get('/api/users', authenticateToken, (req, res) => {
 
 app.post('/api/users', authenticateToken, (req, res) => {
   const { username, password, fullName, role, erpId, department, year, section } = req.body;
+  if (!username || !fullName || !role) {
+    return res.status(400).json({ message: 'Full name, username, and role are required.' });
+  }
+  const existing = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+  if (existing) {
+    return res.status(400).json({ message: 'Username already exists. Please choose a different username.' });
+  }
   const newUser = {
     id: `u-${role.toLowerCase().slice(0, 3)}-${Date.now()}`,
     username,
@@ -1076,6 +1149,16 @@ app.post('/api/notices', authenticateToken, (req, res) => {
   notices.push(newNotice);
   res.status(201).json(newNotice);
 });
+
+// Serve built Angular frontend in production (Single-Service Deploy)
+const clientDistPath = path.join(__dirname, '..', 'client', 'dist', 'uamp-client', 'browser');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+}
 
 // Start Server
 app.listen(PORT, () => {

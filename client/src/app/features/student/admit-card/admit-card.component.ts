@@ -1,7 +1,9 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AdmitCardService } from '../../../core/services/admit-card.service';
+import { ExamService } from '../../../core/services/exam.service';
 import { AdmitCard } from '../../../core/models/admit-card.model';
+import { Exam } from '../../../core/models/exam.model';
 
 @Component({
   selector: 'app-student-admit-card',
@@ -112,23 +114,11 @@ import { AdmitCard } from '../../../core/models/admit-card.model';
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
-                  <tr>
-                    <td class="p-2.5 font-mono font-bold text-indigo-600 dark:text-indigo-400">CS301</td>
-                    <td class="p-2.5 font-semibold text-slate-900 dark:text-white">Database Management Systems</td>
-                    <td class="p-2.5">2026-10-15</td>
-                    <td class="p-2.5">10:00 AM</td>
-                  </tr>
-                  <tr>
-                    <td class="p-2.5 font-mono font-bold text-indigo-600 dark:text-indigo-400">CS302</td>
-                    <td class="p-2.5 font-semibold text-slate-900 dark:text-white">Artificial Intelligence & ML</td>
-                    <td class="p-2.5">2026-10-07</td>
-                    <td class="p-2.5">02:00 PM</td>
-                  </tr>
-                  <tr>
-                    <td class="p-2.5 font-mono font-bold text-indigo-600 dark:text-indigo-400">CS303</td>
-                    <td class="p-2.5 font-semibold text-slate-900 dark:text-white">Computer Networks & Security</td>
-                    <td class="p-2.5">2026-10-20</td>
-                    <td class="p-2.5">11:00 AM</td>
+                  <tr *ngFor="let ex of exams">
+                    <td class="p-2.5 font-mono font-bold text-indigo-600 dark:text-indigo-400">{{ ex.subjectId | uppercase }}</td>
+                    <td class="p-2.5 font-semibold text-slate-900 dark:text-white">{{ ex.subjectName || ex.title }}</td>
+                    <td class="p-2.5">{{ ex.examDate }}</td>
+                    <td class="p-2.5">{{ ex.startTime }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -154,17 +144,22 @@ import { AdmitCard } from '../../../core/models/admit-card.model';
 })
 export class AdmitCardComponent implements OnInit {
   admitCardService = inject(AdmitCardService);
+  examService = inject(ExamService);
   card: AdmitCard | null = null;
+  exams: Exam[] = [];
 
   ngOnInit(): void {
     this.admitCardService.getMyAdmitCard().subscribe(res => {
       this.card = res;
     });
+    this.examService.getExams().subscribe(res => {
+      this.exams = res;
+    });
   }
 
   downloadPdf(): void {
     if (this.card && this.card.status === 'RELEASED') {
-      this.admitCardService.generateAdmitCardPdf(this.card);
+      this.admitCardService.generateAdmitCardPdf(this.card, this.exams);
     }
   }
 }

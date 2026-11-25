@@ -2,13 +2,15 @@ import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { AdmitCard } from '../models/admit-card.model';
+import { Exam } from '../models/exam.model';
 import { jsPDF } from 'jspdf';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AdmitCardService {
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
 
   myAdmitCard = signal<AdmitCard | null>(null);
 
@@ -29,7 +31,7 @@ export class AdmitCardService {
     });
   }
 
-  generateAdmitCardPdf(card: AdmitCard): void {
+  generateAdmitCardPdf(card: AdmitCard, exams: Exam[] = []): void {
     const doc = new jsPDF();
 
     // University Header Banner
@@ -92,11 +94,18 @@ export class AdmitCardService {
     doc.text('Session', 165, 144);
 
     // Table Rows
-    const schedule = [
-      { code: 'CS301', name: 'Database Management Systems', date: '2026-10-15', session: '10:00 AM' },
-      { code: 'CS302', name: 'Artificial Intelligence & ML', date: '2026-10-07', session: '02:00 PM' },
-      { code: 'CS303', name: 'Computer Networks & Security', date: '2026-10-20', session: '11:00 AM' }
-    ];
+    const schedule = exams.length > 0
+      ? exams.slice(0, 5).map(e => ({
+          code: e.subjectId.toUpperCase(),
+          name: e.subjectName || e.title,
+          date: e.examDate,
+          session: e.startTime
+        }))
+      : [
+          { code: 'CS301', name: 'Database Management Systems', date: '2026-10-15', session: '10:00 AM' },
+          { code: 'CS302', name: 'Artificial Intelligence & ML', date: '2026-10-07', session: '02:00 PM' },
+          { code: 'CS303', name: 'Computer Networks & Security', date: '2026-10-20', session: '11:00 AM' }
+        ];
 
     let y = 155;
     schedule.forEach((row, i) => {

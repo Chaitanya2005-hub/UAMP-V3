@@ -141,6 +141,30 @@ import { ProctoringService, ActiveProctorSession } from '../../../core/services/
         </div>
       </div>
 
+      <!-- TERMINATE CONFIRMATION MODAL -->
+      <div *ngIf="showTerminateConfirm" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-500 flex items-center justify-center text-xl font-bold">
+              <i class="fa-solid fa-ban"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-slate-900 dark:text-white">Force Terminate Session</h3>
+              <p class="text-xs text-slate-500">Candidate: {{ showTerminateConfirm.studentName }} ({{ showTerminateConfirm.erpId }})</p>
+            </div>
+          </div>
+          <p class="text-xs text-slate-600 dark:text-slate-400">
+            This will immediately end the proctored examination for this student. The student's answers will NOT be auto-submitted. This action cannot be undone.
+          </p>
+          <div class="flex items-center justify-end gap-3 pt-2">
+            <button (click)="cancelTerminate()" class="btn btn-outline btn-sm">Cancel</button>
+            <button (click)="confirmTerminate()" class="btn btn-danger btn-sm font-bold shadow-md">
+              <i class="fa-solid fa-ban"></i> Confirm Terminate
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   `
 })
@@ -187,9 +211,29 @@ export class LiveMonitoringComponent implements OnInit, OnDestroy {
     });
   }
 
+  showTerminateConfirm: ActiveProctorSession | null = null;
+
   terminateSession(s: ActiveProctorSession): void {
-    if (confirm(`Are you sure you want to force terminate the proctored exam for ${s.studentName}?`)) {
-      alert(`Exam session for ${s.studentName} terminated by Administrator.`);
-    }
+    this.showTerminateConfirm = s;
+  }
+
+  confirmTerminate(): void {
+    if (!this.showTerminateConfirm) return;
+    const s = this.showTerminateConfirm;
+    const reason = `Examination session forcibly terminated by Administrator for candidate ${s.studentName} (${s.erpId}).`;
+    this.proctoringService.terminateSession(s.studentId, reason).subscribe({
+      next: () => {
+        this.showTerminateConfirm = null;
+        this.loadSessions();
+      },
+      error: () => {
+        this.showTerminateConfirm = null;
+        this.loadSessions();
+      }
+    });
+  }
+
+  cancelTerminate(): void {
+    this.showTerminateConfirm = null;
   }
 }

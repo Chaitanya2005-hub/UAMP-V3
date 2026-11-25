@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { User, UserRole } from '../../../core/models/user.model';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-admin-manage-users',
@@ -114,6 +115,27 @@ import { User, UserRole } from '../../../core/models/user.model';
         </div>
       </div>
 
+      <!-- Delete Confirmation Modal -->
+      <div *ngIf="confirmDeleteId" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-500 flex items-center justify-center text-xl font-bold">
+              <i class="fa-solid fa-trash"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-slate-900 dark:text-white">Delete User Account</h3>
+              <p class="text-xs text-slate-500">This action is permanent and cannot be reversed.</p>
+            </div>
+          </div>
+          <div class="flex items-center justify-end gap-3 pt-2">
+            <button (click)="cancelDelete()" class="btn btn-outline btn-sm">Cancel</button>
+            <button (click)="confirmDelete()" class="btn btn-danger btn-sm font-bold shadow-md">
+              <i class="fa-solid fa-trash"></i> Confirm Delete
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   `
 })
@@ -133,13 +155,13 @@ export class ManageUsersComponent implements OnInit {
   }
 
   loadUsers(): void {
-    this.http.get<User[]>('http://localhost:3000/api/users').subscribe(res => {
+    this.http.get<User[]>(`${environment.apiUrl}/users`).subscribe(res => {
       this.users = res;
     });
   }
 
   createUser(): void {
-    this.http.post('http://localhost:3000/api/users', {
+    this.http.post(`${environment.apiUrl}/users`, {
       fullName: this.newFullName,
       username: this.newUsername,
       role: this.newRole,
@@ -153,14 +175,26 @@ export class ManageUsersComponent implements OnInit {
   }
 
   approveUser(id: string): void {
-    this.http.post(`http://localhost:3000/api/users/${id}/approve`, {}).subscribe(() => {
+    this.http.post(`${environment.apiUrl}/users/${id}/approve`, {}).subscribe(() => {
       this.loadUsers();
     });
   }
 
+  confirmDeleteId: string | null = null;
+
   deleteUser(id: string): void {
-    this.http.delete(`http://localhost:3000/api/users/${id}`).subscribe(() => {
+    this.confirmDeleteId = id;
+  }
+
+  confirmDelete(): void {
+    if (!this.confirmDeleteId) return;
+    this.http.delete(`${environment.apiUrl}/users/${this.confirmDeleteId}`).subscribe(() => {
+      this.confirmDeleteId = null;
       this.loadUsers();
     });
+  }
+
+  cancelDelete(): void {
+    this.confirmDeleteId = null;
   }
 }

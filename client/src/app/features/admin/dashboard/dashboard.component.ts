@@ -5,6 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../../core/services/auth.service';
 import { StatCardComponent } from '../../../shared/components/stat-card/stat-card.component';
 import { InrCurrencyPipe } from '../../../shared/pipes/inr-currency.pipe';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -127,16 +128,16 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   loadLiveData(): void {
-    this.http.get<any[]>('http://localhost:3000/api/users').subscribe(users => {
+    this.http.get<any[]>(`${environment.apiUrl}/users`).subscribe(users => {
       this.totalUsersCount = users.length;
       this.pendingUsersCount = users.filter(u => u.approvalStatus === 'PENDING').length;
     });
 
-    this.http.get<any[]>('http://localhost:3000/api/proctor/active-sessions').subscribe(sessions => {
+    this.http.get<any[]>(`${environment.apiUrl}/proctor/active-sessions`).subscribe(sessions => {
       this.activeProctorCount = sessions.length;
     });
 
-    this.http.get<any[]>('http://localhost:3000/api/exams').subscribe(exams => {
+    this.http.get<any[]>(`${environment.apiUrl}/exams`).subscribe(exams => {
       this.examsCount = exams.length;
     });
   }

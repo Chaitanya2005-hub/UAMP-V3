@@ -4,12 +4,13 @@ import { Router } from '@angular/router';
 import { Observable, tap, catchError, of } from 'rxjs';
 import { User, UserRole } from '../models/user.model';
 import { InactivityService } from './inactivity.service';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = 'http://localhost:3000/api/auth';
+  private apiUrl = `${environment.apiUrl}/auth`;
   private inactivityService = inject(InactivityService);
   
   currentUser = signal<User | null>(null);

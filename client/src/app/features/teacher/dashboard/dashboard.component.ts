@@ -4,6 +4,10 @@ import { RouterModule } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { StatCardComponent } from '../../../shared/components/stat-card/stat-card.component';
 import { ProctoringService } from '../../../core/services/proctoring.service';
+import { ExamService } from '../../../core/services/exam.service';
+import { HttpClient } from '@angular/common/http';
+import { User } from '../../../core/models/user.model';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-teacher-dashboard',
@@ -54,16 +58,16 @@ import { ProctoringService } from '../../../core/services/proctoring.service';
 
         <app-stat-card 
           title="Questions in Bank" 
-          value="248" 
-          subtitle="+15 Gemini AI Generated"
+          [value]="questionsCount" 
+          subtitle="Total questions in exam bank"
           iconClass="fa-solid fa-cubes"
           iconBgClass="bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
         </app-stat-card>
 
         <app-stat-card 
           title="Class Average Score" 
-          value="84.2%" 
-          subtitle="Passed rate 91%"
+          [value]="classAverage" 
+          [subtitle]="classAverageSubtitle"
           iconClass="fa-solid fa-chart-column"
           iconBgClass="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
         </app-stat-card>
@@ -104,13 +108,19 @@ import { ProctoringService } from '../../../core/services/proctoring.service';
 export class TeacherDashboardComponent implements OnInit {
   authService = inject(AuthService);
   proctoringService = inject(ProctoringService);
+  examService = inject(ExamService);
+  http = inject(HttpClient);
 
-  activeStudentsCount: number = 0;
+  activeStudentsCount: number | string = 0;
   activeProctorCount: number = 0;
+  questionsCount: number | string = 0;
+  classAverage: string = '—';
+  classAverageSubtitle: string = 'No results yet';
   pollInterval: any;
 
   ngOnInit(): void {
     this.loadLiveData();
+    this.loadStaticData();
     this.pollInterval = setInterval(() => {
       this.loadLiveData();
     }, 3000);
@@ -123,6 +133,23 @@ export class TeacherDashboardComponent implements OnInit {
   loadLiveData(): void {
     this.proctoringService.getActiveSessions().subscribe(sessions => {
       this.activeProctorCount = sessions.length;
+    });
+  }
+
+  loadStaticData(): void {
+    this.http.get<User[]>(`${environment.apiUrl}/users`).subscribe(users => {
+      this.activeStudentsCount = users.filter(u => u.role === 'STUDENT').length;
+    });
+    this.examService.getQuestionsCount().subscribe(res => {
+      this.questionsCount = res.count;
+    });
+    this.examService.getAllResults().subscribe(results => {
+      if (results.length > 0) {
+        const avg = results.reduce((sum, r) => sum + (r.percentage || 0), 0) / results.length;
+        this.classAverage = avg.toFixed(1) + '%';
+        const passed = results.filter(r => r.status === 'PASSED').length;
+        this.classAverageSubtitle = `Pass rate ${Math.round((passed / results.length) * 100)}%`;
+      }
     });
   }
 }

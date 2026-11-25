@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Grievance } from '../../../core/models/grievance.model';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-student-grievances',
@@ -89,14 +90,14 @@ export class GrievancesComponent implements OnInit {
   }
 
   loadGrievances(): void {
-    this.http.get<Grievance[]>('http://localhost:3000/api/grievances').subscribe(res => {
+    this.http.get<Grievance[]>(`${environment.apiUrl}/grievances`).subscribe(res => {
       this.grievances = res;
     });
   }
 
   submitGrievance(): void {
     this.isLoading = true;
-    this.http.post('http://localhost:3000/api/grievances', {
+    this.http.post(`${environment.apiUrl}/grievances`, {
       category: this.category,
       description: this.description
     }).subscribe(() => {

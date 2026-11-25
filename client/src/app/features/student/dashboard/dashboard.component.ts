@@ -4,6 +4,7 @@ import { RouterModule } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { ExamService } from '../../../core/services/exam.service';
 import { AdmitCardService } from '../../../core/services/admit-card.service';
+import { AttendanceService } from '../../../core/services/attendance.service';
 import { FeeService } from '../../../core/services/fee.service';
 import { HttpClient } from '@angular/common/http';
 import { StatCardComponent } from '../../../shared/components/stat-card/stat-card.component';
@@ -11,6 +12,7 @@ import { Exam } from '../../../core/models/exam.model';
 import { AdmitCard } from '../../../core/models/admit-card.model';
 import { Fee } from '../../../core/models/fee.model';
 import { Notice } from '../../../core/models/notice.model';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-student-dashboard',
@@ -46,17 +48,17 @@ import { Notice } from '../../../core/models/notice.model';
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <app-stat-card 
           title="Overall Attendance" 
-          value="92.4%" 
-          subtitle="Cleared for exams"
+          [value]="attendancePercent + '%'" 
+          [subtitle]="attendanceSubtitle"
           iconClass="fa-solid fa-user-check"
           iconBgClass="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400"
-          trend="up">
+          [trend]="attendancePercent >= 75 ? 'up' : 'down'">
         </app-stat-card>
 
         <app-stat-card 
           title="Scheduled Exams" 
           [value]="upcomingExams.length" 
-          subtitle="Next exam on 15 Oct"
+          [subtitle]="nextExamSubtitle"
           iconClass="fa-solid fa-calendar-check"
           iconBgClass="bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400">
         </app-stat-card>
@@ -197,6 +199,7 @@ export class StudentDashboardComponent implements OnInit {
   authService = inject(AuthService);
   examService = inject(ExamService);
   admitCardService = inject(AdmitCardService);
+  attendanceService = inject(AttendanceService);
   feeService = inject(FeeService);
   http = inject(HttpClient);
 
@@ -204,10 +207,23 @@ export class StudentDashboardComponent implements OnInit {
   admitCard: AdmitCard | null = null;
   feeStatus: Fee | null = null;
   notices: Notice[] = [];
+  attendancePercent: number = 100;
+  attendanceSubtitle: string = 'No records yet';
+  nextExamSubtitle: string = 'No upcoming exams';
 
   ngOnInit(): void {
     this.examService.getExams().subscribe(data => {
       this.upcomingExams = data;
+      const next = data.find(e => e.status !== 'COMPLETED');
+      this.nextExamSubtitle = next ? `Next: ${next.examDate}` : 'All exams completed';
+    });
+
+    this.attendanceService.getMyAttendanceHistory().subscribe(records => {
+      if (records.length > 0) {
+        const present = records.filter(r => r.status === 'PRESENT').length;
+        this.attendancePercent = Math.round((present / records.length) * 100);
+        this.attendanceSubtitle = `${present}/${records.length} classes present`;
+      }
     });
 
     this.admitCardService.getMyAdmitCard().subscribe(card => {
@@ -218,7 +234,7 @@ export class StudentDashboardComponent implements OnInit {
       this.feeStatus = fee;
     });
 
-    this.http.get<Notice[]>('http://localhost:3000/api/notices').subscribe(notices => {
+    this.http.get<Notice[]>(`${environment.apiUrl}/notices`).subscribe(notices => {
       this.notices = notices;
     });
   }

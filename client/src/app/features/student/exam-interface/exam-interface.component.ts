@@ -1,5 +1,6 @@
-import { Component, OnInit, OnDestroy, HostListener, ViewChild, ElementRef, inject } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, HostListener, ViewChild, ElementRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ExamService } from '../../../core/services/exam.service';
 import { ProctoringService } from '../../../core/services/proctoring.service';
@@ -9,7 +10,7 @@ import { Result } from '../../../core/models/result.model';
 @Component({
   selector: 'app-exam-interface',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="min-h-screen bg-slate-950 text-white flex flex-col justify-between select-none relative font-sans">
       
@@ -21,6 +22,19 @@ import { Result } from '../../../core/models/result.model';
            class="bg-gradient-to-r from-rose-600 via-rose-700 to-amber-600 text-white py-3 px-6 text-center text-xs sm:text-sm font-extrabold flex items-center justify-center gap-3 animate-bounce shadow-xl z-50">
         <i class="fa-solid fa-triangle-exclamation text-lg animate-pulse"></i>
         <span>HIGH-PRIORITY SECURITY ALERT: 2 TAB SWITCH VIOLATIONS RECORDED. 1 MORE SWITCH WILL FORCE SUBMIT & TERMINATE EXAM IMMEDIATELY!</span>
+      </div>
+
+      <!-- AUDIO NOISE WARNING BANNER (Non-Terminating) -->
+      <div *ngIf="proctoringService.noiseWarningActive()"
+           class="bg-amber-600 text-white py-2.5 px-6 text-xs sm:text-sm font-bold flex items-center justify-between gap-3 shadow-lg z-40">
+        <div class="flex items-center gap-2.5 mx-auto">
+          <i class="fa-solid fa-volume-high text-base animate-pulse"></i>
+          <span>AUDIO WARNING ({{ proctoringService.noiseWarningCount() }}): Excessive background noise or speech detected. Please maintain silence. (Warning only — exam will not be terminated.)</span>
+        </div>
+        <button (click)="proctoringService.dismissNoiseWarning()" type="button"
+                class="px-2.5 py-1 rounded-lg bg-amber-800/60 hover:bg-amber-800 text-xs font-bold shrink-0">
+          Dismiss
+        </button>
       </div>
 
       <!-- 1ST STRIKE MODAL WARNING -->
@@ -40,6 +54,8 @@ import { Result } from '../../../core/models/result.model';
             I Understand & Resume Examination
           </button>
         </div>
+      </div>
+
       <!-- DIRECT PROCTOR INTERVENTION WARNING MODAL -->
       <div *ngIf="incomingProctorWarning" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
         <div class="bg-slate-900 border-2 border-amber-500 rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl shadow-amber-900/50">
@@ -66,7 +82,7 @@ import { Result } from '../../../core/models/result.model';
             <i class="fa-solid fa-shield-halved text-xl"></i>
           </div>
           <div>
-            <h1 class="text-base font-bold text-white leading-none">DBMS Mid-Semester Proctored Examination 2026</h1>
+            <h1 class="text-base font-bold text-white leading-none">{{ examTitle }}</h1>
             <p class="text-xs text-slate-400 mt-1">Anti-Cheat Live WebCam Proctoring Active</p>
           </div>
         </div>
@@ -190,12 +206,75 @@ import { Result } from '../../../core/models/result.model';
 
             <!-- Video Player -->
             <div class="proctor-video-box rounded-2xl overflow-hidden bg-black relative aspect-video border border-indigo-500/30 shadow-inner">
-              <video #webcamVideo autoplay muted playsinline class="w-full h-full object-cover"></video>
-              <div *ngIf="!proctoringService.isWebcamActive()" class="absolute inset-0 flex items-center justify-center bg-slate-950/90 text-xs text-rose-400 text-center p-4">
-                <span>WebCam Disconnected or Access Denied</span>
+              <video #webcamVideo autoplay muted playsinline class="absolute inset-0 w-full h-full object-cover"></video>
+              <div *ngIf="!proctoringService.isWebcamActive()" class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950/90 text-xs text-rose-400 text-center p-4">
+                <span *ngIf="isInitializingWebcam" class="text-slate-300">
+                  <i class="fa-solid fa-spinner animate-spin mr-1"></i> Starting WebCam...
+                </span>
+                <ng-container *ngIf="!isInitializingWebcam">
+                  <span>{{ proctoringService.webcamError() || 'WebCam Disconnected or Access Denied' }}</span>
+                  <button (click)="initWebcam()" type="button" class="btn btn-outline btn-sm text-[11px] text-white border-slate-700 mt-1">
+                    <i class="fa-solid fa-rotate-right"></i> Retry Camera
+                  </button>
+                </ng-container>
+              </div>
+              <div *ngIf="proctoringService.isWebcamActive() && (proctoringService.isCameraMuted() || isBlankFrame)"
+                   class="absolute inset-x-2 bottom-2 bg-amber-950/90 border border-amber-500/40 rounded-lg px-2.5 py-1.5 text-[10px] text-amber-200 leading-snug">
+                No video signal from <strong>{{ proctoringService.activeCameraLabel() || 'camera' }}</strong>. Check camera shutter, Windows privacy, or switch camera below.
               </div>
               <div class="proctor-live-badge">
                 <span class="proctor-live-dot"></span> PROCTOR ACTIVE
+              </div>
+            </div>
+
+            <!-- Camera Device Selector -->
+            <div *ngIf="proctoringService.availableCameras().length > 0" class="space-y-1">
+              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Camera Source</label>
+              <div class="flex items-center gap-2">
+                <select [ngModel]="proctoringService.selectedDeviceId()"
+                        (ngModelChange)="onCameraSelect($event)"
+                        name="cameraSelect"
+                        class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500">
+                  <option *ngFor="let cam of proctoringService.availableCameras(); let i = index" [ngValue]="cam.deviceId">
+                    {{ cam.label || ('Camera ' + (i + 1)) }}
+                  </option>
+                </select>
+                <button (click)="initWebcam(proctoringService.selectedDeviceId())" type="button"
+                        title="Refresh Camera"
+                        class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs">
+                  <i class="fa-solid fa-rotate-right"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Microphone & Noise Monitor -->
+            <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-2">
+              <div class="flex items-center justify-between text-[10px]">
+                <span class="font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <i [class]="proctoringService.isAudioActive() ? 'fa-solid fa-microphone text-emerald-400' : 'fa-solid fa-microphone-slash text-rose-400'"></i>
+                  Audio Monitor
+                </span>
+                <span [ngClass]="proctoringService.noiseWarningCount() > 0 ? 'text-amber-400 font-bold' : 'text-slate-400 font-mono'">
+                  Noise Alerts: {{ proctoringService.noiseWarningCount() }}
+                </span>
+              </div>
+
+              <div *ngIf="proctoringService.isAudioActive()" class="space-y-1">
+                <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div class="h-full transition-all duration-150 rounded-full"
+                       [style.width.%]="proctoringService.audioLevel()"
+                       [ngClass]="proctoringService.audioLevel() >= 25 ? 'bg-amber-400' : 'bg-emerald-400'">
+                  </div>
+                </div>
+                <p class="text-[10px] text-slate-400">Background noise triggers a warning only (does not terminate exam).</p>
+              </div>
+
+              <div *ngIf="!proctoringService.isAudioActive()" class="flex items-center justify-between gap-2 text-[10px] text-amber-300">
+                <span>{{ proctoringService.audioError() || 'Microphone inactive' }}</span>
+                <button (click)="retryAudioMonitor()" type="button"
+                        class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white shrink-0">
+                  Retry Mic
+                </button>
               </div>
             </div>
 
@@ -203,9 +282,10 @@ import { Result } from '../../../core/models/result.model';
             <div class="space-y-2">
               <h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Security Logs</h4>
               <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 h-32 overflow-y-auto font-mono text-[10px] space-y-1 text-slate-300">
-                <p class="text-emerald-400">[00:00:01] Session initiated. WebCam verified.</p>
-                <p class="text-slate-400">[00:00:02] Anti-Cheat focus listener active.</p>
-                <p *ngFor="let log of proctoringService.securityLogs()" class="text-rose-400 font-semibold">
+                <p class="text-emerald-400">[00:00:01] Session initiated. WebCam & Audio verified.</p>
+                <p class="text-slate-400">[00:00:02] Anti-Cheat focus & noise listeners active.</p>
+                <p *ngFor="let log of proctoringService.securityLogs()"
+                   [ngClass]="log.includes('Audio Warning') ? 'text-amber-400 font-semibold' : 'text-rose-400 font-semibold'">
                   {{ log }}
                 </p>
               </div>
@@ -225,7 +305,7 @@ import { Result } from '../../../core/models/result.model';
     </div>
   `
 })
-export class ExamInterfaceComponent implements OnInit, OnDestroy {
+export class ExamInterfaceComponent implements OnInit, AfterViewInit, OnDestroy {
   route = inject(ActivatedRoute);
   router = inject(Router);
   examService = inject(ExamService);
@@ -235,11 +315,16 @@ export class ExamInterfaceComponent implements OnInit, OnDestroy {
   @ViewChild('snapshotCanvas') snapshotCanvasRef!: ElementRef<HTMLCanvasElement>;
 
   examId: string = 'ex-101';
+  examTitle: string = 'Proctored Online Examination';
   questions: Question[] = [];
   currentQuestionIndex: number = 0;
   selectedAnswers: Record<string, string> = {};
 
   isLoadingQuestions: boolean = true;
+  isSubmitting: boolean = false;
+  isInitializingWebcam: boolean = true;
+  isBlankFrame: boolean = false;
+  private isRequestingCameraPermission: boolean = false;
   secondsRemaining: number = 45 * 60; // 45 mins
   timerInterval: any;
   proctorStreamInterval: any;
@@ -262,11 +347,13 @@ export class ExamInterfaceComponent implements OnInit, OnDestroy {
   // 1. ATTACH TAB SWITCH & BLUR LISTENERS
   @HostListener('window:blur')
   onWindowBlur(): void {
+    if (this.isRequestingCameraPermission) return;
     this.handleFocusViolation('Window focus lost / Tab switched');
   }
 
   @HostListener('document:visibilitychange')
   onVisibilityChange(): void {
+    if (this.isRequestingCameraPermission) return;
     if (document.hidden) {
       this.handleFocusViolation('Browser tab hidden / Minimized');
     }
@@ -276,6 +363,16 @@ export class ExamInterfaceComponent implements OnInit, OnDestroy {
     this.proctoringService.resetWarnings();
     this.examId = this.route.snapshot.params['id'] || 'ex-101';
     this.isLoadingQuestions = true;
+
+    this.examService.getExams().subscribe(exams => {
+      const matched = exams.find(e => e.id === this.examId);
+      if (matched) {
+        this.examTitle = matched.title;
+        if (matched.durationMinutes > 0) {
+          this.secondsRemaining = matched.durationMinutes * 60;
+        }
+      }
+    });
 
     this.examService.getQuestions(this.examId).subscribe({
       next: (qs) => {
@@ -292,9 +389,6 @@ export class ExamInterfaceComponent implements OnInit, OnDestroy {
       }
     });
 
-    // Start WebCam
-    this.initWebcam();
-
     // Start Timer
     this.timerInterval = setInterval(() => {
       if (this.secondsRemaining > 0) {
@@ -308,6 +402,10 @@ export class ExamInterfaceComponent implements OnInit, OnDestroy {
     this.proctorStreamInterval = setInterval(() => {
       this.pushStreamSnapshot();
     }, 4000);
+  }
+
+  ngAfterViewInit(): void {
+    this.initWebcam();
   }
 
   getDefaultQuestionPaper(): Question[] {
@@ -348,13 +446,46 @@ export class ExamInterfaceComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.timerInterval) clearInterval(this.timerInterval);
     if (this.proctorStreamInterval) clearInterval(this.proctorStreamInterval);
+    if (this.webcamVideoRef?.nativeElement) {
+      this.webcamVideoRef.nativeElement.srcObject = null;
+    }
     this.proctoringService.stopWebcam();
   }
 
-  async initWebcam(): Promise<void> {
-    const stream = await this.proctoringService.startWebcam();
+  async initWebcam(deviceId?: string): Promise<void> {
+    this.isInitializingWebcam = true;
+    this.isBlankFrame = false;
+    this.isRequestingCameraPermission = true;
+    const stream = await this.proctoringService.startWebcam(deviceId, true);
+    this.isInitializingWebcam = false;
+
     if (stream && this.webcamVideoRef) {
-      this.webcamVideoRef.nativeElement.srcObject = stream;
+      const videoEl = this.webcamVideoRef.nativeElement;
+      await this.proctoringService.attachStreamToVideo(videoEl, stream);
+      // Push first snapshot as soon as video frames are ready
+      if (videoEl.videoWidth > 0) {
+        this.pushStreamSnapshot();
+      } else {
+        videoEl.addEventListener('loadeddata', () => this.pushStreamSnapshot(), { once: true });
+      }
+    }
+
+    setTimeout(() => {
+      this.isRequestingCameraPermission = false;
+    }, 500);
+  }
+
+  async retryAudioMonitor(): Promise<void> {
+    this.isRequestingCameraPermission = true;
+    await this.proctoringService.startAudioMonitor();
+    setTimeout(() => {
+      this.isRequestingCameraPermission = false;
+    }, 500);
+  }
+
+  onCameraSelect(deviceId: string): void {
+    if (deviceId) {
+      this.initWebcam(deviceId);
     }
   }
 
@@ -390,14 +521,30 @@ export class ExamInterfaceComponent implements OnInit, OnDestroy {
     if (this.snapshotCanvasRef && this.webcamVideoRef && this.proctoringService.isWebcamActive()) {
       const canvas = this.snapshotCanvasRef.nativeElement;
       const video = this.webcamVideoRef.nativeElement;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (ctx && video.videoWidth > 0) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const sample = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        let hasSignal = false;
+        for (let i = 0; i < sample.length; i += 64) {
+          if (sample[i] > 8 || sample[i + 1] > 8 || sample[i + 2] > 8) {
+            hasSignal = true;
+            break;
+          }
+        }
+        this.isBlankFrame = !hasSignal;
         frameUrl = canvas.toDataURL('image/jpeg', 0.5);
+      } else {
+        this.isBlankFrame = true;
       }
     }
 
     this.proctoringService.sendFrameStream(this.examId, frameUrl, this.currentQuestionIndex + 1).subscribe(res => {
+      if (res?.forceTerminated && !this.isSubmitting) {
+        alert('EXAM TERMINATED: Administrator has terminated your proctored exam session.');
+        this.submitExam();
+        return;
+      }
       if (res && res.messages && res.messages.length > 0) {
         const latest = res.messages[res.messages.length - 1];
         this.incomingProctorWarning = latest.text;
@@ -439,6 +586,8 @@ export class ExamInterfaceComponent implements OnInit, OnDestroy {
   }
 
   submitExam(): void {
+    if (this.isSubmitting) return;
+    this.isSubmitting = true;
     if (this.timerInterval) clearInterval(this.timerInterval);
     if (this.proctorStreamInterval) clearInterval(this.proctorStreamInterval);
 
@@ -447,9 +596,14 @@ export class ExamInterfaceComponent implements OnInit, OnDestroy {
       this.selectedAnswers,
       this.proctoringService.warningCount(),
       this.proctoringService.securityLogs()
-    ).subscribe((res: Result) => {
-      this.proctoringService.stopWebcam();
-      this.router.navigate(['/student/results']);
+    ).subscribe({
+      next: () => {
+        this.proctoringService.stopWebcam();
+        this.router.navigate(['/student/results']);
+      },
+      error: () => {
+        this.isSubmitting = false;
+      }
     });
   }
 

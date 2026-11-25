@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Question } from '../models/question.model';
+import { environment } from '../../../environments/environment';
 
 export interface AiQuestionResponse {
   source: 'GEMINI_API' | 'FALLBACK_GENERATOR';
@@ -12,7 +13,7 @@ export interface AiQuestionResponse {
   providedIn: 'root'
 })
 export class GeminiAiService {
-  private apiUrl = 'http://localhost:3000/api/teacher';
+  private apiUrl = `${environment.apiUrl}/teacher`;
 
   constructor(private http: HttpClient) {}
 

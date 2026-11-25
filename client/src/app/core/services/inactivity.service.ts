@@ -12,13 +12,15 @@ export class InactivityService {
   private readonly INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
   private timer: any;
   private isTracking = false;
+  private onLogoutCallback: (() => void) | null = null;
 
   private activityEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
-  private boundResetTimer = this.resetTimer.bind(this);
+  private boundResetTimer = () => this.resetTimer();
 
   startTracking(onInactivityLogout: () => void): void {
     if (this.isTracking) return;
     this.isTracking = true;
+    this.onLogoutCallback = onInactivityLogout;
 
     this.ngZone.runOutsideAngular(() => {
       this.activityEvents.forEach(event => {
@@ -26,12 +28,13 @@ export class InactivityService {
       });
     });
 
-    this.resetTimer(onInactivityLogout);
+    this.resetTimer();
   }
 
   stopTracking(): void {
     if (!this.isTracking) return;
     this.isTracking = false;
+    this.onLogoutCallback = null;
 
     if (this.timer) {
       clearTimeout(this.timer);
@@ -43,16 +46,17 @@ export class InactivityService {
     });
   }
 
-  private resetTimer(onLogoutCallback?: () => void): void {
+  private resetTimer(): void {
     if (this.timer) {
       clearTimeout(this.timer);
     }
 
     this.timer = setTimeout(() => {
       this.ngZone.run(() => {
+        const callback = this.onLogoutCallback;
         this.stopTracking();
-        if (onLogoutCallback) {
-          onLogoutCallback();
+        if (callback) {
+          callback();
         }
       });
     }, this.INACTIVITY_TIMEOUT_MS);

@@ -1,5 +1,6 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { ExamService } from '../../../core/services/exam.service';
 import { ProctoringService } from '../../../core/services/proctoring.service';
@@ -8,7 +9,7 @@ import { Exam } from '../../../core/models/exam.model';
 @Component({
   selector: 'app-exam-list',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   template: `
     <div class="space-y-6 animate-fade-in">
       
@@ -34,13 +35,34 @@ import { Exam } from '../../../core/models/exam.model';
           </div>
 
           <div class="proctor-video-box rounded-2xl overflow-hidden bg-black relative">
-            <video #previewVideo autoplay muted playsinline class="w-full h-full object-cover"></video>
-            <div *ngIf="!webcamStatus" class="absolute inset-0 flex items-center justify-center bg-slate-950/80 text-xs text-slate-400">
-              <span>Initializing Camera Feed...</span>
+            <video #previewVideo autoplay muted playsinline class="absolute inset-0 w-full h-full object-cover"></video>
+            <div *ngIf="!webcamStatus" class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950/90 text-xs text-center p-4">
+              <span *ngIf="isInitializingWebcam" class="text-slate-300">
+                <i class="fa-solid fa-spinner animate-spin mr-1.5"></i>Initializing Camera Feed...
+              </span>
+              <ng-container *ngIf="!isInitializingWebcam && proctoringService.webcamError() as camErr">
+                <i class="fa-solid fa-video-slash text-2xl text-rose-400"></i>
+                <span class="text-rose-400 font-semibold">{{ camErr }}</span>
+                <button (click)="testWebcam()" class="btn btn-outline btn-sm text-xs mt-1">
+                  <i class="fa-solid fa-rotate-right"></i> Retry Camera
+                </button>
+              </ng-container>
             </div>
             <div *ngIf="webcamStatus" class="proctor-live-badge">
               <span class="proctor-live-dot"></span> LIVE FEED OK
             </div>
+          </div>
+
+          <div *ngIf="proctoringService.availableCameras().length > 0" class="space-y-1">
+            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Select Camera</label>
+            <select [ngModel]="proctoringService.selectedDeviceId()"
+                    (ngModelChange)="onCameraSelect($event)"
+                    name="testCameraSelect"
+                    class="form-control text-xs py-1.5">
+              <option *ngFor="let cam of proctoringService.availableCameras(); let i = index" [ngValue]="cam.deviceId">
+                {{ cam.label || ('Camera ' + (i + 1)) }}
+              </option>
+            </select>
           </div>
 
           <p class="text-xs text-slate-500 dark:text-slate-400">
@@ -112,14 +134,18 @@ import { Exam } from '../../../core/models/exam.model';
     </div>
   `
 })
-export class ExamListComponent implements OnInit {
+export class ExamListComponent implements OnInit, OnDestroy {
   examService = inject(ExamService);
   proctoringService = inject(ProctoringService);
   router = inject(Router);
+  cdr = inject(ChangeDetectorRef);
+
+  @ViewChild('previewVideo') previewVideoRef?: ElementRef<HTMLVideoElement>;
 
   exams: Exam[] = [];
   showWebcamTestModal = false;
   webcamStatus = false;
+  isInitializingWebcam = false;
 
   ngOnInit(): void {
     this.examService.getExams().subscribe(data => {
@@ -127,21 +153,42 @@ export class ExamListComponent implements OnInit {
     });
   }
 
-  async testWebcam(): Promise<void> {
+  ngOnDestroy(): void {
+    this.proctoringService.stopWebcam();
+  }
+
+  async testWebcam(deviceId?: string): Promise<void> {
     this.showWebcamTestModal = true;
-    const stream = await this.proctoringService.startWebcam();
-    if (stream) {
+    this.webcamStatus = false;
+    this.isInitializingWebcam = true;
+    this.cdr.detectChanges();
+
+    const stream = await this.proctoringService.startWebcam(deviceId);
+    this.isInitializingWebcam = false;
+
+    if (stream && this.showWebcamTestModal) {
+      this.cdr.detectChanges();
+      const videoEl = this.previewVideoRef?.nativeElement;
+      await this.proctoringService.attachStreamToVideo(videoEl, stream);
       this.webcamStatus = true;
-      setTimeout(() => {
-        const videoEl = document.querySelector('video') as HTMLVideoElement;
-        if (videoEl) videoEl.srcObject = stream;
-      }, 100);
+    } else if (!this.showWebcamTestModal) {
+      this.proctoringService.stopWebcam();
+    }
+  }
+
+  onCameraSelect(deviceId: string): void {
+    if (deviceId) {
+      this.testWebcam(deviceId);
     }
   }
 
   closeWebcamTest(): void {
+    if (this.previewVideoRef?.nativeElement) {
+      this.previewVideoRef.nativeElement.srcObject = null;
+    }
     this.proctoringService.stopWebcam();
     this.showWebcamTestModal = false;
     this.webcamStatus = false;
+    this.isInitializingWebcam = false;
   }
 }

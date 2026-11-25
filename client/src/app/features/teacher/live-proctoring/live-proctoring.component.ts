@@ -180,6 +180,15 @@ export class LiveProctoringComponent implements OnInit, OnDestroy {
   }
 
   flagStudent(s: ActiveProctorSession): void {
-    alert(`Flagged suspicious activity for candidate ${s.studentName} (${s.erpId}). Flag recorded in security audit logs.`);
+    const reason = `Suspicious activity flagged by Faculty Proctor for candidate ${s.studentName} (${s.erpId}).`;
+    this.proctoringService.flagStudent(s.studentId, reason).subscribe({
+      next: () => {
+        this.loadSessions();
+      },
+      error: () => {
+        // Session may have already ended
+        this.loadSessions();
+      }
+    });
   }
 }

@@ -162,7 +162,12 @@ import { HttpClient } from '@angular/common/http';
             </select>
           </div>
 
-          <button type="submit" [disabled]="!manualQText" class="btn btn-primary font-bold">
+          <div *ngIf="manualSubmitMessage" class="p-3 rounded-xl text-xs font-semibold"
+               [ngClass]="manualSubmitMessage.startsWith('✅') ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-600' : 'bg-rose-500/10 border border-rose-500/30 text-rose-600'">
+            {{ manualSubmitMessage }}
+          </div>
+
+          <button type="submit" [disabled]="!manualQText || !manualOptA || !manualOptB || !manualOptC || !manualOptD" class="btn btn-primary font-bold">
             Save Question to Exam
           </button>
         </form>
@@ -229,8 +234,33 @@ export class UploadQuestionsComponent implements OnInit {
     });
   }
 
+  manualSubmitMessage: string = '';
+
   submitManualQuestion(): void {
-    alert('Question added successfully!');
-    this.manualQText = '';
+    if (!this.manualQText || !this.manualOptA || !this.manualOptB || !this.manualOptC || !this.manualOptD) return;
+    this.examService.addManualQuestion({
+      examId: this.manualExamId,
+      questionText: this.manualQText,
+      optionA: this.manualOptA,
+      optionB: this.manualOptB,
+      optionC: this.manualOptC,
+      optionD: this.manualOptD,
+      correctAnswer: this.manualCorrect
+    }).subscribe({
+      next: () => {
+        this.manualSubmitMessage = '✅ Question saved to exam bank successfully!';
+        this.manualQText = '';
+        this.manualOptA = '';
+        this.manualOptB = '';
+        this.manualOptC = '';
+        this.manualOptD = '';
+        this.manualCorrect = 'A';
+        setTimeout(() => this.manualSubmitMessage = '', 4000);
+      },
+      error: () => {
+        this.manualSubmitMessage = '❌ Failed to save question. Please try again.';
+        setTimeout(() => this.manualSubmitMessage = '', 4000);
+      }
+    });
   }
 }

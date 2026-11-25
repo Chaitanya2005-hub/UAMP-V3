@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Subject } from '../../../core/models/subject.model';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-admin-manage-subjects',
@@ -93,13 +94,13 @@ export class ManageSubjectsComponent implements OnInit {
   }
 
   loadSubjects(): void {
-    this.http.get<Subject[]>('http://localhost:3000/api/subjects').subscribe(res => {
+    this.http.get<Subject[]>(`${environment.apiUrl}/subjects`).subscribe(res => {
       this.subjects = res;
     });
   }
 
   createSubject(): void {
-    this.http.post('http://localhost:3000/api/subjects', {
+    this.http.post(`${environment.apiUrl}/subjects`, {
       name: this.newName,
       code: this.newCode,
       department: this.newDept

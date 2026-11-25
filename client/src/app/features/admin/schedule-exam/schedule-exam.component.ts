@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { ExamService } from '../../../core/services/exam.service';
 import { Subject } from '../../../core/models/subject.model';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-admin-schedule-exam',
@@ -85,7 +86,7 @@ export class ScheduleExamComponent implements OnInit {
   isLoading: boolean = false;
 
   ngOnInit(): void {
-    this.http.get<Subject[]>('http://localhost:3000/api/subjects').subscribe(res => {
+    this.http.get<Subject[]>(`${environment.apiUrl}/subjects`).subscribe(res => {
       this.subjects = res;
       if (this.subjects.length > 0) this.subjectId = this.subjects[0].id;
     });

@@ -8,7 +8,8 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
-      if (error.status === 401 || error.status === 403) {
+      const isAuthAction = req.url.includes('/api/auth/login') || req.url.includes('/api/auth/verify-otp-register');
+      if ((error.status === 401 || error.status === 403) && !isAuthAction) {
         console.warn('Authentication token expired or forbidden:', error.message);
         authService.logout();
       }
